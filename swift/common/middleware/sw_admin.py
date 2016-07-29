@@ -1,4 +1,4 @@
-# add copyright later ..
+## TODO, add copyright later ..
 
 import os
 
@@ -37,7 +37,7 @@ class SWAdminMiddleware(object):
         req = Request(env)
         if req.path == '/sw_admin':
             print("Shashi request = %s" %(req))
-            handler = self.GET
+            handler = self.DELETE_CACHE # default handler set to delete the cached tokens
             if self.disable_path and os.path.exists(self.disable_path):
                 handler = self.DISABLED
             return handler(req)(env, start_response)
