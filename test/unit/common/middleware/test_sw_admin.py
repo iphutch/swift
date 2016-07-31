@@ -38,21 +38,21 @@ class TestSWAdmin(unittest.TestCase):
         req = Request.blank('/sw_admin', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
         app = self.get_app(FakeApp(), {})
         resp = app(req.environ, self.start_response)
-        self.assertEqual(['204 Deleted Tokens'], self.got_statuses)
+        self.assertEqual(['204 No Content'], self.got_statuses)
         self.assertEqual(resp, ['Deleted Tokens'])
 
     def test_swadmin_pass(self):
         req = Request.blank('/', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
         app = self.get_app(FakeApp(), {})
         resp = app(req.environ, self.start_response)
-        self.assertEqual(['204 Deleted Tokens'], self.got_statuses)
+        self.assertEqual(['200 OK'], self.got_statuses)
         self.assertEqual(resp, ['FAKE APP'])
 
     def test_swadmin_pass_not_disabled(self):
         req = Request.blank('/sw_admin', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
         app = self.get_app(FakeApp(), {}, disable_path=self.disable_path)
         resp = app(req.environ, self.start_response)
-        self.assertEqual(['204 Deleted Tokens'], self.got_statuses)
+        self.assertEqual(['204 No Content'], self.got_statuses)
         self.assertEqual(resp, ['Deleted Tokens'])
 
     def test_swadmin_pass_disabled(self):

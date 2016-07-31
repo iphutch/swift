@@ -50,4 +50,4 @@ def filter_factory(global_conf, **local_conf):
 
     def swadmin_filter(app):
         return SWAdminMiddleware(app, conf)
-    return healthcheck_filter
+    return swadmin_filter
