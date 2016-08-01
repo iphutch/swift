@@ -18,15 +18,15 @@ class SWAdminMiddleware(object):
 
     def __init__(self, app, conf):
         self.app = app
-        self.disable_path = conf.get('disable_path', '')
+        self.enable_sw_admin = conf.get('enable_sw_admin', 'False')
 
     def GET(self, req):
         """Returns a 200 response with "OK" in the body."""
         return Response(request=req, body="OK", content_type="text/plain")
 
     def DISABLED(self, req):
-        """Returns a 503 response with "DISABLED BY FILE" in the body."""
-        return Response(request=req, status=503, body="DISABLED BY FILE",
+        """Returns a 503 response with "DISABLED BY ADMIN" in the body."""
+        return Response(request=req, status=503, body="FEATURE DISABLED BY ADMIN",
                         content_type="text/plain")
 
     def DELETE_CACHE(self, req):
@@ -38,13 +38,15 @@ class SWAdminMiddleware(object):
 
     def __call__(self, env, start_response):
         req = Request(env)
+        handler = self.DISABLED
         if req.path == '/sw_admin':
-            if req.method == "DELETE" and req.headers.get('X-DELETE-TOKEN'):
-                print("Shashi req.method DELETE")
-                handler = self.DELETE_CACHE  # handler set to delete the cached tokens
-            if self.disable_path and os.path.exists(self.disable_path):
-                print("Shashi self.disable = %s" % (self.disable_path))
+            if not self.enable_sw_admin:
+                print("Shashi swift_admin middleware not enabled , enable_sw_admin = %s" % (self.enable_sw_admin))
                 handler = self.DISABLED
+            else:
+                 if req.method == "DELETE" and req.headers.get('X-DELETE-TOKEN'):
+                      print("Shashi req.method DELETE")
+                      handler = self.DELETE_CACHE  # handler set to delete the cached tokens
             return handler(req)(env, start_response)
         return self.app(env, start_response)
 

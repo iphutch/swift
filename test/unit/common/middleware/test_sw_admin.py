@@ -20,12 +20,8 @@ class FakeApp(object):
 class TestSWAdmin(unittest.TestCase):
 
     def setUp(self):
-        self.tempdir = tempfile.mkdtemp()
-        self.disable_path = os.path.join(self.tempdir, 'test-sw_admin')
+        self.enable_sw_admin = self.get_app(FakeApp(), {}).enable_sw_admin
         self.got_statuses = []
-
-    def tearDown(self):
-        shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def get_app(self, app, global_conf, **local_conf):
         factory = sw_admin.filter_factory(global_conf, **local_conf)
@@ -35,33 +31,53 @@ class TestSWAdmin(unittest.TestCase):
         self.got_statuses.append(status)
 
     def test_swadmin(self):
-        req = Request.blank('/sw_admin', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
+        self.enable_sw_admin = True
+        req = Request.blank('/sw_admin', environ={
+            'REQUEST_METHOD': 'DELETE'}, headers={
+            'X-DELETE-TOKEN': 'test_sw_admin'
+        })
         app = self.get_app(FakeApp(), {})
         resp = app(req.environ, self.start_response)
         self.assertEqual(['204 No Content'], self.got_statuses)
         self.assertEqual(resp, ['Deleted Tokens'])
 
     def test_swadmin_pass(self):
-        req = Request.blank('/', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
+        req = Request.blank('/', environ={'REQUEST_METHOD': 'DELETE'})
         app = self.get_app(FakeApp(), {})
         resp = app(req.environ, self.start_response)
         self.assertEqual(['200 OK'], self.got_statuses)
         self.assertEqual(resp, ['FAKE APP'])
 
     def test_swadmin_pass_not_disabled(self):
-        req = Request.blank('/sw_admin', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
-        app = self.get_app(FakeApp(), {}, disable_path=self.disable_path)
+        self.enable_sw_admin = True
+        req = Request.blank('/sw_admin', environ={
+            'REQUEST_METHOD': 'DELETE'}, headers={
+            'X-DELETE-TOKEN': 'test_sw_admin'
+        })
+        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         resp = app(req.environ, self.start_response)
         self.assertEqual(['204 No Content'], self.got_statuses)
         self.assertEqual(resp, ['Deleted Tokens'])
 
     def test_swadmin_pass_disabled(self):
-        open(self.disable_path, 'w')
-        req = Request.blank('/sw_admin', environ={'REQUEST_METHOD': 'DELETE_CACHE'})
-        app = self.get_app(FakeApp(), {}, disable_path=self.disable_path)
+        self.enable_sw_admin = False
+        req = Request.blank('/sw_admin', environ={'REQUEST_METHOD': 'DELETE'})
+        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         resp = app(req.environ, self.start_response)
         self.assertEqual(['503 Service Unavailable'], self.got_statuses)
-        self.assertEqual(resp, ['DISABLED BY FILE'])
+        self.assertEqual(resp, ['FEATURE DISABLED BY ADMIN'])
+
+    #req.method == "DELETE" and req.headers.get('X-DELETE-TOKEN')
+    def test_delete_cached_token(self):
+        self.enable_sw_admin = True
+        req = Request.blank('/sw_admin', environ={
+            'REQUEST_METHOD': 'DELETE'}, headers={
+            'X-DELETE-TOKEN': 'test_sw_admin'
+        })
+        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
+        resp = app(req.environ, self.start_response)
+        self.assertEqual(['204 No Content'], self.got_statuses)
+        self.assertEqual(resp, ['Deleted Tokens'])
 
 
 if __name__ == '__main__':
