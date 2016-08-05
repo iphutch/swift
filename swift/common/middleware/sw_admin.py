@@ -3,6 +3,7 @@
 import os
 
 from swift.common.swob import Request, Response
+from swift.common.utils import config_true_value
 import swift.common.memcached as memcached
 
 
@@ -18,7 +19,7 @@ class SWAdminMiddleware(object):
 
     def __init__(self, app, conf):
         self.app = app
-        self.enable_sw_admin = conf.get('enable_sw_admin', 'False')
+        self.enable_sw_admin = config_true_value(conf.get('enable_sw_admin', 'False'))
 
     def GET(self, req):
         """Returns a 200 response with "OK" in the body."""
@@ -38,15 +39,16 @@ class SWAdminMiddleware(object):
 
     def __call__(self, env, start_response):
         req = Request(env)
+        print("Shashi enable_sw_admin = %s" % (self.enable_sw_admin))
         handler = self.DISABLED
         if req.path == '/sw_admin':
-            if not self.enable_sw_admin:
-                print("Shashi swift_admin middleware not enabled , enable_sw_admin = %s" % (self.enable_sw_admin))
-                handler = self.DISABLED
+            if self.enable_sw_admin:
+                if req.method == "DELETE" and req.headers.get('X-DELETE_TOKEN'):
+                    print("Shashi req.method DELETE")
+                    handler = self.DELETE_CACHE # handler set to delete the cached tokens
             else:
-                 if req.method == "DELETE" and req.headers.get('X-DELETE-TOKEN'):
-                      print("Shashi req.method DELETE")
-                      handler = self.DELETE_CACHE  # handler set to delete the cached tokens
+                print("Shashi, swift_admin middleware not enabled; enable_sw_admin = %s" % (self.enable_sw_admin))
+                handler = self.DISABLED
             return handler(req)(env, start_response)
         return self.app(env, start_response)
 
