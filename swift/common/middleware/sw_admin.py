@@ -33,8 +33,12 @@ class SWAdminMiddleware(object):
     def DELETE_CACHE(self, req):
         """ Deletes the cached auth tokens from memcached"""
         user_id = req.headers.get('X-DELETE-TOKEN')
-        if self.delete_cached_token(user_id):
-            return Response(request=req, status=204, body="Deleted Tokens",
+        try:
+            if self.delete_cached_token(user_id):
+                return Response(request=req, status=204, body="Deleted Tokens",
+                            content_type="text/plain")
+        except ValueError as error:
+            return Response(request=req, status=404, body=error.message,
                             content_type="text/plain")
 
     def __call__(self, env, start_response):
@@ -59,6 +63,9 @@ class SWAdminMiddleware(object):
         """
         memcache = memcached.MemcacheRing(['127.0.0.1:11211'])
         token = memcache.get('AUTH_/user/%s' % (user_id))
+        if token is None:
+            raise ValueError(
+                'Invalid account_name name: %s' % (user_id))
         result1 = memcache.delete('AUTH_/user/%s' % (user_id))
         result2 = memcache.delete('AUTH_/token/%s' % (token))
         if result1 == None and result2 == None:
