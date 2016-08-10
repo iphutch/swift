@@ -75,6 +75,7 @@ class SWAdminMiddleware(object):
         except NotImplementedError as error:
             return HTTPMethodNotAllowed(str(error),
                 req=req, headers={"Allowed": "DELETE"})(env, start_response)
+
         except (Exception):
             start_response('5XX Server Error',
                            [('Content-Type', 'text/plain')])
@@ -115,6 +116,7 @@ class SWAdminMiddleware(object):
         if token is None:
             raise ValueError(
                 'Invalid Account Name: %s \n' % (user_id))
+
         result1 = memcache.delete('AUTH_/user/%s' % (user_id))
         result2 = memcache.delete('AUTH_/token/%s' % (token))
         if result1 == None and result2 == None:
