@@ -33,6 +33,7 @@ class SWAdminMiddleware(object):
     def __init__(self, app, conf):
         self.app = app
         self.enable_sw_admin = config_true_value(conf.get('enable_sw_admin', 'False'))
+        self.memcache = memcached.MemcacheRing(['127.0.0.1:11211'])
 
     def DISABLED(self, req):
         """
@@ -110,13 +111,13 @@ class SWAdminMiddleware(object):
         :param user_id:
         :return: boolean status
         """
-        memcache = memcached.MemcacheRing(['127.0.0.1:11211'])
-        token = memcache.get('AUTH_/user/%s' % (user_id))
+        token = self.memcache.get('AUTH_/user/%s' % (user_id))
         if token is None:
             raise ValueError(
                 'Invalid Account Name: %s \n' % (user_id))
-        result1 = memcache.delete('AUTH_/user/%s' % (user_id))
-        result2 = memcache.delete('AUTH_/token/%s' % (token))
+
+        result1 = self.memcache.delete('AUTH_/user/%s' % (user_id))
+        result2 = self.memcache.delete('AUTH_/token/%s' % (token))
         if result1 == None and result2 == None:
             return True
         else:
