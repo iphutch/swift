@@ -1,16 +1,29 @@
-### TODO - add Copyright
+# Author: Shashirekha Gundur <shashirekha.j.gundur@intel.com>
+# Copyright (c) 2016 OpenStack Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import unittest
 from time import time
+from eventlet import Timeout
 from contextlib import contextmanager
-from swift.common.swob import Request, Response, HTTPException, HTTPForbidden
+from swift.common.swob import Request, Response, HTTPRequestTimeout
 from swift.common.middleware import sw_admin
 
-
 class FakeApp(object):
+
     def __init__(self, fakememcache=None):
-        if fakememcache is None:
-            memcache = None
         self.memcache = fakememcache
 
     def __call__(self, env, start_response):
@@ -20,14 +33,17 @@ class FakeApp(object):
 
 class FakeMemcacheRing(object):
 
-    def __init__(self):
+    def __init__(self, io_timeout= 2.0):
         self.store = {}
+        self._io_timeout = io_timeout
+        self.forceTimeout = False
 
     def get(self, key):
         return self.store.get(key)
 
-    def set(self, key, value, time=0):
-        self.store[key] = value
+    def set(self, user_id='foo'):
+        self.store['AUTH_/user/%s' % user_id] = 'dummy_token'
+        self.store['AUTH_/token/dummy_token'] = 'dummy_value'
         return True
 
     def incr(self, key, time=0):
@@ -40,11 +56,13 @@ class FakeMemcacheRing(object):
 
     def delete(self, key):
         try:
-            del self.store[key]
-        except Exception:
-            pass
-        return True
-
+            with Timeout(self._io_timeout):
+                if self.forceTimeout:
+                    time.sleep(5)
+                del self.store[key]
+                return
+        except (Exception, Timeout) as e:
+            raise HTTPRequestTimeout
 
 
 class TestSWAdmin(unittest.TestCase):
@@ -59,18 +77,6 @@ class TestSWAdmin(unittest.TestCase):
 
     def start_response(self, status, headers):
         self.got_statuses.append(status)
-
-    # pass case , 204 No Conent
-    def test_swadmin(self):
-        self.enable_sw_admin = True
-        req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE'}, headers={
-            'X-DELETE-TOKEN': 'test_sw_admin'
-        })
-        app = self.get_app(FakeApp(), {})
-        resp = app(req.environ, self.start_response)
-        self.assertEqual(['503 Service Unavailable'], self.got_statuses)
-        self.assertEqual(resp, ['FEATURE DISABLED BY ADMIN'])
 
     # pass case , 200 OK
     def test_swadmin_pass(self):
@@ -96,9 +102,41 @@ class TestSWAdmin(unittest.TestCase):
     def test_delete_cached_token_pass(self):
         self.enable_sw_admin = True
         fakememcache = FakeMemcacheRing()
-        cache_key = 'AUTH_/user/foo'
-        cache_entry = 'AUTH_/token/foo'
-        fakememcache.set(cache_key, cache_entry)
+        user_id = 'foo'
+        fakememcache.set(user_id)
+        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
+        app.memcache = fakememcache
+        req = Request.blank('/sw_admin', environ={
+            'REQUEST_METHOD': 'DELETE'}, headers={
+            'X-DELETE-TOKEN': 'foo'
+        })
+        resp = app(req.environ, self.start_response)
+        self.assertEqual(['204 No Content'], self.got_statuses)
+        self.assertEqual(resp, ['Deleted Tokens'])
+
+    # test_delete_cached_token 2, fail for invalid inputs for account/user_id
+    def test_delete_cached_token_fail_token_error(self):
+        self.enable_sw_admin = True
+        fakememcache = FakeMemcacheRing()
+        user_id = 'foo'
+        fakememcache.set(user_id)
+        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
+        app.memcache = fakememcache
+        req = Request.blank('/sw_admin', environ={
+            'REQUEST_METHOD': 'DELETE'}, headers={
+            'X-DELETE-TOKEN': 'not_foo'
+        })
+        resp = app(req.environ, self.start_response)
+        self.assertEqual(['404 Not Found'], self.got_statuses)
+        self.assertEqual(resp, ['Invalid Account Name: not_foo \n'])
+
+    # test_delete_cached_token 3, fail by server timeout exception
+    def test_delete_cached_token_fail_memcache_error(self):
+        self.enable_sw_admin = True
+        fakememcache = FakeMemcacheRing(io_timeout= 0.0)
+        user_id = 'foo'
+        fakememcache.set(user_id)
+        fakememcache.forceTimeout = True
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         app.memcache = fakememcache
         req = Request.blank('/sw_admin', environ={
@@ -107,48 +145,8 @@ class TestSWAdmin(unittest.TestCase):
         })
         resp = app(req.environ, self.start_response)
         self.assertEqual(['5XX Server Error'], self.got_statuses)
-        self.assertEqual(resp, ['Internal server error.\n'])
+        self.assertEqual(resp,['Internal server error.\n'])
 
-    # test_delete_cached_token 2, fail for invalid inputs for account/user_id
-    def test_delete_cached_token_fail_token_error(self):
-        self.enable_sw_admin = True
-        fakememcache = FakeMemcacheRing()
-        cache_key = 'AUTH_/user/foo'
-        cache_entry = 'AUTH_/token/foo'
-        fakememcache.set(cache_key, cache_entry)
-        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
-        app.memcache = fakememcache
-        req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE'}, headers={
-            'X-DELETE-TOKEN': 'not_foo'
-        })
-        resp = app(req.environ, self.start_response)
-        #self.assertRaises(ValueError, resp)
-        self.assertEqual(['404 Not Found'], self.got_statuses)
-        self.assertEqual(resp, ['Invalid Account Name: not_foo \n'])
-        #with self.assertRaises(ValueError) as error:
-            #resp = app(req.environ, self.start_response)
-        #self.assertEqual(404, error.status)
-
-
-    # test_delete_cached_token 3, fail by server timeout exception (common.memcached)
-    def test_delete_cached_token_fail_memcache_error(self):
-        self.enable_sw_admin = True
-        fakememcache = FakeMemcacheRing()
-        cache_key = 'AUTH_/user/foo'
-        cache_entry = 'AUTH_/token/foo'
-        fakememcache.set(cache_key, cache_entry)
-        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
-        app.memcache = fakememcache
-        req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE'}, headers={
-            'X-DELETE-TOKEN': 'foo'
-        })
-        resp = app(req.environ, self.start_response)
-        self.assertRaises(Exception, resp)
-        #with self.assertRaises(Exception) as catcher:
-        #    resp = app(req.environ, self.start_response)
-        #self.assertEqual(412, catcher.exception.status_int)
 
     # test_delete_cached_token 4, fail with invalid header inputs
     def test_delete_cached_token_fail_missing_header_value(self):
