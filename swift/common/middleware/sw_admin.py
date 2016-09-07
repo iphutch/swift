@@ -77,6 +77,7 @@ class SWAdminMiddleware(object):
             return HTTPMethodNotAllowed(str(error),
                 req=req, headers={"Allowed": "DELETE"})(env, start_response)
         except (Exception):
+            print("sw_admin, in exception= %s" % (Exception.message))
             start_response('5XX Server Error',
                            [('Content-Type', 'text/plain')])
             return ['Internal server error.\n']
@@ -91,18 +92,18 @@ class SWAdminMiddleware(object):
         if self.enable_sw_admin:
             if req.method == "DELETE":
                 if req.headers.get('X-DELETE-TOKEN'):
-                    print("Shashi req.method DELETE")
+                    print("sw_admin req.method DELETE")
                     handler = self.DELETE_CACHE  # handler set to delete the cached tokens
                 else:
-                    print("Shashi req.method DELETE , missing Headers/Header values")
+                    print("sw_admin req.method DELETE , missing Headers/Header values")
                     raise ValueError(
                         'Request method DELETE is missing Headers/Header values.\n')
             else:
-                print("Shashi , sw_admin %s request method not supported" % (req.method))
+                print("sw_admin , %s request method not supported" % (req.method))
                 raise NotImplementedError(
                     'Request method %s is not supported.\n' % (req.method))
         else:
-            print("Shashi, swift_admin middleware not enabled; enable_sw_admin = %s" % (self.enable_sw_admin))
+            print("sw_admin, swift_admin middleware not enabled; enable_sw_admin = %s" % (self.enable_sw_admin))
             handler = self.DISABLED
         return handler
 

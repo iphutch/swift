@@ -43,7 +43,7 @@ class FakeMemcacheRing(object):
             del self.store[key]
         except Exception:
             pass
-        return True
+        return
 
 
 
@@ -59,18 +59,6 @@ class TestSWAdmin(unittest.TestCase):
 
     def start_response(self, status, headers):
         self.got_statuses.append(status)
-
-    # pass case , 204 No Conent
-    def test_swadmin(self):
-        self.enable_sw_admin = True
-        req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE'}, headers={
-            'X-DELETE-TOKEN': 'test_sw_admin'
-        })
-        app = self.get_app(FakeApp(), {})
-        resp = app(req.environ, self.start_response)
-        self.assertEqual(['503 Service Unavailable'], self.got_statuses)
-        self.assertEqual(resp, ['FEATURE DISABLED BY ADMIN'])
 
     # pass case , 200 OK
     def test_swadmin_pass(self):
@@ -106,8 +94,8 @@ class TestSWAdmin(unittest.TestCase):
             'X-DELETE-TOKEN': 'foo'
         })
         resp = app(req.environ, self.start_response)
-        self.assertEqual(['5XX Server Error'], self.got_statuses)
-        self.assertEqual(resp, ['Internal server error.\n'])
+        self.assertEqual(['204 No Content'], self.got_statuses)
+        self.assertEqual(resp, ['Deleted Tokens'])
 
     # test_delete_cached_token 2, fail for invalid inputs for account/user_id
     def test_delete_cached_token_fail_token_error(self):
