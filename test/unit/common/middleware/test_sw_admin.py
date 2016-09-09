@@ -133,7 +133,7 @@ class TestSWAdmin(unittest.TestCase):
     # test_delete_cached_token 3, fail by server timeout exception
     def test_delete_cached_token_fail_memcache_error(self):
         self.enable_sw_admin = True
-        fakememcache = FakeMemcacheRing(io_timeout= 0.0)
+        fakememcache = FakeMemcacheRing()
         user_id = 'foo'
         fakememcache.set(user_id)
         fakememcache.forceTimeout = True
