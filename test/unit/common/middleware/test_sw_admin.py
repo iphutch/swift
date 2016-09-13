@@ -174,7 +174,6 @@ class TestSWAdmin(unittest.TestCase):
     # test_delete_cached_token 6, fail with incorrect request method
     def test_delete_cached_token_fail_incorrect_method(self):
         self.enable_sw_admin = True
-        #allowed_methods = ['DELETE']
         #not_allowed_methods = ['PUT', 'HEAD', 'GET', 'POST']
         method = 'PUT'
         req = Request.blank('/sw_admin', environ={

@@ -132,6 +132,36 @@ Healthcheck
     :members:
     :show-inheritance:
 
+SW-Admin middleware used for deleting cached tokens.
+
+    Admin/Op use only :
+    If the path is /sw_admin, and  'enable_sw_admin' in the proxy-server.conf is set to 'false'
+    it will respond with 503 "FEATURE DISABLED BY ADMIN" as the body.
+
+    To invalidate/delete cached auth tokens, set 'enable_sw_admin' to 'true' and use below command
+
+    e.g. $ curl http://127.0.0.1:8080/sw_admin -X DELETE -H 'X-DELETE-TOKEN: test:tester'
+
+    where value for 'X-DELETE-TOKEN' will be the 'account:user' for which tokens need to be deleted
+
+.. _sw_admin:
+
+SW_Admin
+========
+
+Swift Admin middleware provide ops with an endpoint to delete
+cached auth tokens for a user. Unless disabled (i.e ``enable_sw_admin=false`` in
+:ref:`proxy-server-config`), a DELETE request to ``/sw_admin`` with header value for
+``X-DELETE-TOKEN`` as the ``account:user``. An example request::
+
+    curl http://127.0.0.1:8080/sw_admin -X DELETE -H 'X-DELETE-TOKEN: test:tester'
+
+This may be op/administrator-only middlware available via ``/sw_admin``.
+
+.. automodule:: swift.common.middleware.sw_admin
+    :members:
+    :show-inheritance:
+
 Keymaster
 =========
 

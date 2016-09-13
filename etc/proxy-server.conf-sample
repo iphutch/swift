@@ -79,12 +79,12 @@ bind_port = 8080
 [pipeline:main]
 # This sample pipeline uses tempauth and is used for SAIO dev work and
 # testing. See below for a pipeline using keystone.
-pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk tempurl ratelimit tempauth copy container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
+pipeline = catch_errors gatekeeper healthcheck sw_admin proxy-logging cache container_sync bulk tempurl ratelimit tempauth copy container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
 
 # The following pipeline shows keystone integration. Comment out the one
 # above and uncomment this one. Additional steps for integrating keystone are
 # covered further below in the filter sections for authtoken and keystoneauth.
-#pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk tempurl ratelimit authtoken keystoneauth copy container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
+#pipeline = catch_errors gatekeeper healthcheck sw_admin proxy-logging cache container_sync bulk tempurl ratelimit authtoken keystoneauth copy container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
 
 [app:proxy-server]
 use = egg:swift#proxy
@@ -383,6 +383,13 @@ use = egg:swift#healthcheck
 # balancer pool during maintenance or upgrade (remove the file to allow the
 # node back into the load balancer pool).
 # disable_path =
+
+[filter:sw_admin]
+use = egg:swift#sw_admin
+# To invalidate/delete cached auth tokens, set 'enable_sw_admin' to 'true',
+# will cause the sw_admin URL to return "503 Service Unavailable" with a body
+# of "FEATURE DISABLED BY ADMIN".
+# enable_sw_admin = true
 
 [filter:cache]
 use = egg:swift#memcache
