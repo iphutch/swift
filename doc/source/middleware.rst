@@ -151,6 +151,8 @@ This may be op/administrator-only middlware available via ``/sw_admin``.
     :members:
     :show-inheritance:
 
+.. _keymaster:
+
 Keymaster
 =========
 
