@@ -16,7 +16,7 @@
 
 from swift.common.swob import Request, Response
 from swift.common.utils import config_true_value
-from swift.common.swob import HTTPBadRequest, HTTPMethodNotAllowed
+from swift.common.swob import HTTPBadRequest, HTTPMethodNotAllowed, HTTPUnauthorized
 import swift.common.memcached as memcached
 
 
@@ -49,14 +49,6 @@ class SWAdminMiddleware(object):
         self.enable_sw_admin = config_true_value(conf.get('enable_sw_admin', 'False'))
         self.memcache = memcached.MemcacheRing(['127.0.0.1:11211'])
 
-    def DISABLED(self, req):
-        """
-        Returns a 503 response with "DISABLED BY ADMIN" in the body.
-        :param req: swob.Request object
-        """
-        return Response(request=req, status=503, body="FEATURE DISABLED BY ADMIN",
-                        content_type="text/plain")
-
     def DELETE_CACHE(self, req):
         """
         Deletes the cached auth tokens from memcached
@@ -80,6 +72,15 @@ class SWAdminMiddleware(object):
         :param start_response: WSGI callable
         """
         req = Request(env)
+        print("SHASHI in sw_admin.call ENV= %s" % (env))
+        if 'swift.authorize' in env:
+            print("Shashi in sw_admin_call; 'swift.authorize' in env")
+            print("Shashi 'swift.authorize' = %s " % (env['swift.authorize']))
+            response = env['swift.authorize'](req)
+            #Unauthorized, exit
+            if response:
+                print("Shashi HTTPUnauthorized error = %s " % (response))
+                return HTTPUnauthorized(str(response))(env, start_response)
         try:
             if req.path == '/sw_admin':
                 handler = self.get_request_handler(req)
@@ -100,8 +101,6 @@ class SWAdminMiddleware(object):
         :param req: swob.Request object
         :return: request handler
         """
-        handler = self.DISABLED
-
         if self.enable_sw_admin:
             if req.method == "DELETE":
                 if req.headers.get('X-DELETE-TOKEN'):
@@ -112,9 +111,10 @@ class SWAdminMiddleware(object):
             else:
                 raise NotImplementedError(
                     'Request method %s is not supported.\n' % (req.method))
+            return handler
         else:
-            handler = self.DISABLED
-        return handler
+            return Response(request=req, status=503, body="FEATURE DISABLED BY ADMIN",
+                                                    content_type="text/plain")
 
     def delete_cached_token(self, user_id):
         """ To delete cached tokens from memcache, for users who are no longer valid
@@ -137,5 +137,8 @@ def filter_factory(global_conf, **local_conf):
     conf.update(local_conf)
 
     def swadmin_filter(app):
-        return SWAdminMiddleware(app, conf)
+        if config_true_value(conf.get('enable_sw_admin', 'False')):
+            return SWAdminMiddleware(app, conf)
+        else:
+            return app
     return swadmin_filter

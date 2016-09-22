@@ -25,6 +25,7 @@ class FakeApp(object):
 
     def __init__(self, fakememcache=None):
         self.memcache = fakememcache
+        self.enable_sw_admin = False
 
     def __call__(self, env, start_response):
         req = Request(env)
@@ -88,12 +89,13 @@ class TestSWAdmin(unittest.TestCase):
 
     # fail with enable_sw_admin disabled/set to False
     def test_swadmin_pass_disabled(self):
-        self.enable_sw_admin = False
+        self.enable_sw_admin = True
         req = Request.blank('/sw_admin', environ={
             'REQUEST_METHOD': 'DELETE'}, headers={
             'X-DELETE-TOKEN': 'test_sw_admin'
         })
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
+        app.enable_sw_admin = False
         resp = app(req.environ, self.start_response)
         self.assertEqual(['503 Service Unavailable'], self.got_statuses)
         self.assertEqual(resp, ['FEATURE DISABLED BY ADMIN'])
