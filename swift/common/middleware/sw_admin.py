@@ -72,29 +72,27 @@ class SWAdminMiddleware(object):
         :param start_response: WSGI callable
         """
         req = Request(env)
-        print("SHASHI in sw_admin.call ENV= %s" % (env))
-        if 'swift.authorize' in env:
-            print("Shashi in sw_admin_call; 'swift.authorize' in env")
-            print("Shashi 'swift.authorize' = %s " % (env['swift.authorize']))
+        if 'swift.authorize' in env and 'swift_owner' in env:
             response = env['swift.authorize'](req)
             #Unauthorized, exit
             if response:
-                print("Shashi HTTPUnauthorized error = %s " % (response))
                 return HTTPUnauthorized(str(response))(env, start_response)
-        try:
-            if req.path == '/sw_admin':
-                handler = self.get_request_handler(req)
-                return handler(req)(env, start_response)
-            return self.app(env, start_response)
-        except ValueError as error:
-            return HTTPBadRequest(str(error))(env, start_response)
-        except NotImplementedError as error:
-            return HTTPMethodNotAllowed(str(error),
-                req=req, headers={"Allowed": "DELETE"})(env, start_response)
-        except (Exception):
-            start_response('5XX Server Error',
-                           [('Content-Type', 'text/plain')])
-            return ['Internal server error.\n']
+            try:
+                if req.path == '/sw_admin':
+                    handler = self.get_request_handler(req)
+                    return handler(req)(env, start_response)
+                return self.app(env, start_response)
+            except ValueError as error:
+                return HTTPBadRequest(str(error))(env, start_response)
+            except NotImplementedError as error:
+                return HTTPMethodNotAllowed(str(error),
+                                            req=req, headers={"Allowed": "DELETE"})(env, start_response)
+            except (Exception):
+                start_response('5XX Server Error',
+                               [('Content-Type', 'text/plain')])
+                return ['Internal server error.\n']
+        else:
+            return HTTPUnauthorized(req)(env, start_response)
 
     def get_request_handler(self, req):
         """
@@ -112,9 +110,9 @@ class SWAdminMiddleware(object):
                 raise NotImplementedError(
                     'Request method %s is not supported.\n' % (req.method))
             return handler
-        else:
-            return Response(request=req, status=503, body="FEATURE DISABLED BY ADMIN",
-                                                    content_type="text/plain")
+        # else:
+        #     return Response(request=req, status=503, body="FEATURE DISABLED BY ADMIN",
+        #                                             content_type="text/plain")
 
     def delete_cached_token(self, user_id):
         """ To delete cached tokens from memcache, for users who are no longer valid
