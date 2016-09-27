@@ -15,8 +15,8 @@
 # limitations under the License.
 
 from swift.common.swob import Request, Response
-from swift.common.utils import config_true_value
-from swift.common.swob import HTTPBadRequest, HTTPMethodNotAllowed, HTTPUnauthorized
+from swift.common.utils import config_true_value, config_read_reseller_options
+from swift.common.swob import HTTPBadRequest, HTTPMethodNotAllowed, HTTPUnauthorized, HTTPForbidden
 import swift.common.memcached as memcached
 
 
@@ -26,17 +26,19 @@ class SWAdminMiddleware(object):
 
     Admin/Op use only :
     If the path is /sw_admin, and  'enable_sw_admin' in the proxy-server.conf is set to 'false'
-    it will respond with 503 "FEATURE DISABLED BY ADMIN" as the body.
+    it will respond with 412 "Bad URL" as the body.
 
     To invalidate/delete cached auth tokens, set 'enable_sw_admin' to 'true' and use below command
 
-    e.g. $ curl http://127.0.0.1:8080/sw_admin -X DELETE -H 'X-DELETE-TOKEN: test:tester'
+    e.g. $ curl http://127.0.0.1:8080/sw_admin -X DELETE -H 'X-DELETE-TOKEN: test:tester' \
+    -H 'x-auth-token: AUTH_tk90701b3135704effbab7d1438e2ed649'
 
     where value for 'X-DELETE-TOKEN' will be the 'account:user' for which tokens need to be deleted
+    and 'X-AUTH-TOKEN' will have valid auth token for the op/admin making this delete request.
 
     e.g. changes to proxy-server.conf to add/enable sw-admin middleware-
     [pipeline:main]
-    pipeline = catch_errors gatekeeper healthcheck sw_admin proxy-logging ...
+    pipeline = catch_errors gatekeeper ...tempauth sw_admin ...
 
     [filter:sw_admin]
     use = egg:swift#sw_admin
@@ -48,6 +50,8 @@ class SWAdminMiddleware(object):
         self.app = app
         self.enable_sw_admin = config_true_value(conf.get('enable_sw_admin', 'False'))
         self.memcache = memcached.MemcacheRing(['127.0.0.1:11211'])
+        self.reseller_prefixes, self.account_rules = \
+            config_read_reseller_options(conf, dict(require_group=''))
 
     def DELETE_CACHE(self, req):
         """
@@ -72,11 +76,11 @@ class SWAdminMiddleware(object):
         :param start_response: WSGI callable
         """
         req = Request(env)
-        if 'swift.authorize' in env and 'swift_owner' in env:
-            response = env['swift.authorize'](req)
+        if 'swift.authorize' in env: #and 'swift_owner' in env
+            auth_response = env['swift.authorize'].__name__
             #Unauthorized, exit
-            if response:
-                return HTTPUnauthorized(str(response))(env, start_response)
+            if auth_response.strip().lower() == 'denied_response':
+                return HTTPForbidden(str('Access was denied to this resource.'))(env, start_response)
             try:
                 if req.path == '/sw_admin':
                     handler = self.get_request_handler(req)
@@ -92,7 +96,7 @@ class SWAdminMiddleware(object):
                                [('Content-Type', 'text/plain')])
                 return ['Internal server error.\n']
         else:
-            return HTTPUnauthorized(req)(env, start_response)
+            return HTTPUnauthorized(str("Unauthorized Access denied"))(env, start_response)
 
     def get_request_handler(self, req):
         """
@@ -110,9 +114,6 @@ class SWAdminMiddleware(object):
                 raise NotImplementedError(
                     'Request method %s is not supported.\n' % (req.method))
             return handler
-        # else:
-        #     return Response(request=req, status=503, body="FEATURE DISABLED BY ADMIN",
-        #                                             content_type="text/plain")
 
     def delete_cached_token(self, user_id):
         """ To delete cached tokens from memcache, for users who are no longer valid
@@ -123,8 +124,8 @@ class SWAdminMiddleware(object):
         if token is None:
             raise ValueError(
                 'Invalid Account Name: %s \n' % (user_id))
-        result1 = self.memcache.delete('AUTH_/user/%s' % (user_id))
-        result2 = self.memcache.delete('AUTH_/token/%s' % (token))
+        result1 = self.memcache.delete('%s/user/%s' % (self.reseller_prefixes[0], user_id))
+        result2 = self.memcache.delete('%s/token/%s' % (self.reseller_prefixes[0], token))
         if result1 == None and result2 == None:
             return True
         else:

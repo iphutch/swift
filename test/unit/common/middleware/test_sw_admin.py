@@ -18,7 +18,7 @@ import unittest
 from time import time
 from eventlet import Timeout
 from contextlib import contextmanager
-from swift.common.swob import Request, Response, HTTPRequestTimeout, HTTPUnauthorized
+from swift.common.swob import Request, Response, HTTPRequestTimeout, HTTPForbidden
 from swift.common.middleware import sw_admin
 
 class FakeApp(object):
@@ -32,6 +32,7 @@ class FakeApp(object):
         return Response(request=req, body='FAKE APP')(
             env, start_response)
 
+reseller_prefixes = 'AUTH_'
 class FakeMemcacheRing(object):
 
     def __init__(self, io_timeout= 2.0):
@@ -43,8 +44,8 @@ class FakeMemcacheRing(object):
         return self.store.get(key)
 
     def set(self, user_id='foo'):
-        self.store['AUTH_/user/%s' % user_id] = 'dummy_token'
-        self.store['AUTH_/token/dummy_token'] = 'dummy_value'
+        self.store['%s/user/%s' % (reseller_prefixes, user_id)] = 'dummy_token'
+        self.store['%s/token/dummy_token' % (reseller_prefixes)] = 'dummy_value'
         return True
 
     def incr(self, key, time=0):
@@ -88,33 +89,21 @@ class TestSWAdmin(unittest.TestCase):
         self.assertEqual(resp, ['FAKE APP'])
 
     # for no/invalid auth token access, fail with Unauthorized error
-    def test_swadmin_fail_no_or_invalid_auth_token(self):
+    def test_swadmin_fail_no_auth_token(self):
         called = [False]
 
-        def authorize(req):
+        def denied_response(req):
             called[0] = True
-            return HTTPUnauthorized(request=req)
+            return HTTPForbidden(request=req)
 
         self.enable_sw_admin = True
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'swift_owner': True},
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': denied_response, 'swift_owner': True},
             headers={'X-DELETE-TOKEN': 'test_sw_admin'})
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         app.enable_sw_admin = False
         resp = app(req.environ, self.start_response)
-        self.assertEqual(['401 Unauthorized'], self.got_statuses)
-
-    # for non Swift Owner access, fail with Unauthorized error
-    def test_swadmin_fail_not_swift_owner(self):
-        self.enable_sw_admin = True
-        req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift_owner': False}, headers={
-            'X-DELETE-TOKEN': 'test_sw_admin'
-        })
-        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
-        app.enable_sw_admin = False
-        resp = app(req.environ, self.start_response)
-        self.assertEqual(['401 Unauthorized'], self.got_statuses)
+        self.assertEqual(['403 Forbidden'], self.got_statuses)
 
     # test_delete_cached_token 1, pass with valid inputs
     def test_delete_cached_token_pass(self):
