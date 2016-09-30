@@ -76,11 +76,11 @@ class SWAdminMiddleware(object):
         :param start_response: WSGI callable
         """
         req = Request(env)
-        if 'swift.authorize' in env: #and 'swift_owner' in env
+        if 'swift.authorize' in env and 'reseller_request' in env:
             auth_response = env['swift.authorize'].__name__
             #Unauthorized, exit
             if auth_response.strip().lower() == 'denied_response':
-                return HTTPForbidden(str('Access was denied to this resource.'))(env, start_response)
+               return HTTPForbidden(str('Access was denied to this resource.'))(env, start_response)
             try:
                 if req.path == '/sw_admin':
                     handler = self.get_request_handler(req)
@@ -96,7 +96,7 @@ class SWAdminMiddleware(object):
                                [('Content-Type', 'text/plain')])
                 return ['Internal server error.\n']
         else:
-            return HTTPUnauthorized(str("Unauthorized Access denied"))(env, start_response)
+            return HTTPUnauthorized(str("Denied Request, Unauthorized Access.\n"))(env, start_response)
 
     def get_request_handler(self, req):
         """
@@ -123,7 +123,7 @@ class SWAdminMiddleware(object):
         token = self.memcache.get('AUTH_/user/%s' % (user_id))
         if token is None:
             raise ValueError(
-                'Invalid Account Name: %s \n' % (user_id))
+                'Invalid Name/User does not exist: %s \n' % (user_id))
         result1 = self.memcache.delete('%s/user/%s' % (self.reseller_prefixes[0], user_id))
         result2 = self.memcache.delete('%s/token/%s' % (self.reseller_prefixes[0], token))
         if result1 == None and result2 == None:

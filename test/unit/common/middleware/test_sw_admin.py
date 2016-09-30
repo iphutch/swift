@@ -88,7 +88,24 @@ class TestSWAdmin(unittest.TestCase):
         self.assertEqual(['200 OK'], self.got_statuses)
         self.assertEqual(resp, ['FAKE APP'])
 
-    # for no/invalid auth token access, fail with Unauthorized error
+    # for non reseller_admin access, fail with Unauthorized Access error
+    def test_swadmin_fail_not_reseller_admin(self):
+        called = [False]
+
+        def authorize(req):
+            called[0] = True
+
+        self.enable_sw_admin = True
+        req = Request.blank('/sw_admin', environ={
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': False},
+                            headers={'X-DELETE-TOKEN': 'test_sw_admin'})
+        app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
+        app.enable_sw_admin = False
+        resp = app(req.environ, self.start_response)
+        self.assertEqual(['401 Unauthorized'], self.got_statuses)
+        self.assertEqual(resp, ['Denied Request, Unauthorized Access.\n'])
+
+    # for no auth token access, fail with Access Forbidden error
     def test_swadmin_fail_no_auth_token(self):
         called = [False]
 
@@ -98,7 +115,7 @@ class TestSWAdmin(unittest.TestCase):
 
         self.enable_sw_admin = True
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': denied_response, 'swift_owner': True},
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': denied_response, 'reseller_request': True},
             headers={'X-DELETE-TOKEN': 'test_sw_admin'})
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         app.enable_sw_admin = False
@@ -119,7 +136,7 @@ class TestSWAdmin(unittest.TestCase):
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         app.memcache = fakememcache
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'swift_owner': True},
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': True},
             headers={'X-DELETE-TOKEN': 'foo'})
         resp = app(req.environ, self.start_response)
         self.assertEqual(['204 No Content'], self.got_statuses)
@@ -139,11 +156,11 @@ class TestSWAdmin(unittest.TestCase):
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         app.memcache = fakememcache
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'swift_owner': True},
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': True},
             headers={'X-DELETE-TOKEN': 'not_foo'})
         resp = app(req.environ, self.start_response)
         self.assertEqual(['404 Not Found'], self.got_statuses)
-        self.assertEqual(resp, ['Invalid Account Name: not_foo \n'])
+        self.assertEqual(resp, ['Invalid Name/User does not exist: not_foo \n'])
 
     # test_delete_cached_token 3, fail by server timeout exception
     def test_delete_cached_token_fail_memcache_error(self):
@@ -160,7 +177,7 @@ class TestSWAdmin(unittest.TestCase):
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         app.memcache = fakememcache
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'swift_owner': True},
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': True},
             headers={'X-DELETE-TOKEN': 'foo'})
         resp = app(req.environ, self.start_response)
         self.assertEqual(['5XX Server Error'], self.got_statuses)
@@ -176,7 +193,7 @@ class TestSWAdmin(unittest.TestCase):
 
         self.enable_sw_admin = True
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'swift_owner': True},
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': True},
             headers={'X-DELETE-TOKEN': ''})
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         resp = app(req.environ, self.start_response)
@@ -192,7 +209,7 @@ class TestSWAdmin(unittest.TestCase):
 
         self.enable_sw_admin = True
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'swift_owner': True
+            'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': True
         })
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         resp = app(req.environ, self.start_response)
@@ -210,7 +227,7 @@ class TestSWAdmin(unittest.TestCase):
         #not_allowed_methods = ['PUT', 'HEAD', 'GET', 'POST']
         method = 'PUT'
         req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': method, 'swift.authorize': authorize, 'swift_owner': True},
+            'REQUEST_METHOD': method, 'swift.authorize': authorize, 'reseller_request': True},
             headers={})
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
         resp = app(req.environ, self.start_response)
