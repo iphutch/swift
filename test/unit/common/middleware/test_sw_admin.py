@@ -100,7 +100,6 @@ class TestSWAdmin(unittest.TestCase):
             'REQUEST_METHOD': 'DELETE', 'swift.authorize': authorize, 'reseller_request': False},
                             headers={'X-DELETE-TOKEN': 'test_sw_admin'})
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
-        app.enable_sw_admin = False
         resp = app(req.environ, self.start_response)
         self.assertEqual(['401 Unauthorized'], self.got_statuses)
         self.assertEqual(resp, ['Denied Request, Unauthorized Access.\n'])
@@ -118,7 +117,7 @@ class TestSWAdmin(unittest.TestCase):
             'REQUEST_METHOD': 'DELETE', 'swift.authorize': denied_response, 'reseller_request': True},
             headers={'X-DELETE-TOKEN': 'test_sw_admin'})
         app = self.get_app(FakeApp(), {}, enable_sw_admin=self.enable_sw_admin)
-        app.enable_sw_admin = False
+        #app.enable_sw_admin = False
         resp = app(req.environ, self.start_response)
         self.assertEqual(['403 Forbidden'], self.got_statuses)
 

@@ -76,7 +76,7 @@ class SWAdminMiddleware(object):
         :param start_response: WSGI callable
         """
         req = Request(env)
-        if 'swift.authorize' in env and 'reseller_request' in env:
+        if 'swift.authorize' in env and env.get('reseller_request'):
             auth_response = env['swift.authorize'].__name__
             #Unauthorized, exit
             if auth_response.strip().lower() == 'denied_response':
