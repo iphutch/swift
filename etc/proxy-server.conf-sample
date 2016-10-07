@@ -384,12 +384,9 @@ use = egg:swift#healthcheck
 # node back into the load balancer pool).
 # disable_path =
 
+# Note: Put after auth in the pipeline.
 [filter:sw_admin]
 use = egg:swift#sw_admin
-# To invalidate/delete cached auth tokens, set 'enable_sw_admin' to 'true',
-# will cause the sw_admin URL to return "503 Service Unavailable" with a body
-# of "FEATURE DISABLED BY ADMIN".
-# enable_sw_admin = true
 
 [filter:cache]
 use = egg:swift#memcache

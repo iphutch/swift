@@ -138,14 +138,13 @@ SW_Admin
 ========
 
 Swift Admin middleware provides Ops with an endpoint to delete
-cached auth tokens for a user. Unless disabled (i.e ``enable_sw_admin=false`` in
-:ref:`proxy-server-config`), a DELETE request to ``/sw_admin`` with header value for
-``X-DELETE-TOKEN`` as the ``account:user`` and with valid auth token as header value
-for ``X-AUTH-TOKEN`` will delete the cached tokens for this user.
-An example request::
+cached auth tokens for a user. DELETE request to ``/sw_admin`` with header
+value for ``X-DELETE-TOKEN`` as the ``account:user`` and with valid auth
+token as header value for ``X-AUTH-TOKEN`` will delete the cached tokens for
+this user. An example request::
 
-    curl http://127.0.0.1:8080/sw_admin -X DELETE -H 'X-DELETE-TOKEN: test:tester' \
-    -H 'x-auth-token: AUTH_tk90701b3135704effbab7d1438e2ed649'
+    curl http://127.0.0.1:8080/sw_admin -X DELETE -H 'X-DELETE-TOKEN:
+    test:tester' -H 'x-auth-token: AUTH_tk90701b3135704effbab7d1438e2ed649'
 
 This may be op/administrator-only middlware available via ``/sw_admin``.
 

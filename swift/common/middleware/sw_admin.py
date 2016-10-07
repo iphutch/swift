@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from swift.common.swob import Request, Response
-from swift.common.utils import config_true_value, config_read_reseller_options
+from swift.common.utils import config_read_reseller_options
 from swift.common.swob import HTTPBadRequest, HTTPMethodNotAllowed, \
     HTTPUnauthorized, HTTPForbidden
 import swift.common.memcached as memcached
@@ -44,24 +44,23 @@ class SWAdminMiddleware(object):
 
     [filter:sw_admin]
     use = egg:swift#sw_admin
-    enable_sw_admin = true
 
     """
 
     def __init__(self, app, conf):
         self.app = app
-        self.enable_sw_admin = config_true_value(conf.get('enable_sw_admin',
-                                                          'False'))
-        self.memcache = memcached.MemcacheRing(['127.0.0.1:11211'])
+        self.memcache_servers = conf.get('memcache_servers', '127.0.0.1:11211')
+        self.memcache = memcached.MemcacheRing(
+            [s.strip() for s in self.memcache_servers.split(',') if s.strip()])
         self.reseller_prefixes, self.account_rules = \
             config_read_reseller_options(conf, dict(require_group=''))
 
-    def DELETE_CACHE(self, req):
+    def delete_cache(self, req):
         """
         Deletes the cached auth tokens from memcached
         :param req: swob.Request object
         """
-        user_id = req.headers.get('X-DELETE-TOKEN')
+        user_id = req.headers.get('X-Delete-Token')
         try:
             if self.delete_cached_token(user_id):
                 return Response(request=req, status=204, body="Deleted Tokens",
@@ -108,17 +107,16 @@ class SWAdminMiddleware(object):
         :param req: swob.Request object
         :return: request handler
         """
-        if self.enable_sw_admin:
-            if req.method == "DELETE":
-                if req.headers.get('X-DELETE-TOKEN'):
-                    handler = self.DELETE_CACHE  # to delete cached tokens
-                else:
-                    raise ValueError('Request method DELETE is missing '
-                                     'Headers/Header values.\n')
+        if req.method == "DELETE":
+            if req.headers.get('X-Delete-Token'):
+                handler = self.delete_cache  # to delete cached tokens
             else:
-                raise NotImplementedError(
-                    'Request method %s is not supported.\n' % (req.method))
-            return handler
+                raise ValueError('DELETE request is missing '
+                                 'X-Delete-Token header/value.\n')
+        else:
+            raise NotImplementedError(
+                'Request method %s is not supported.\n' % (req.method))
+        return handler
 
     def delete_cached_token(self, user_id):
         """ To delete cached tokens from memcache, for users who are no
@@ -126,7 +124,8 @@ class SWAdminMiddleware(object):
         :param user_id:
         :return: boolean status
         """
-        token = self.memcache.get('AUTH_/user/%s' % (user_id))
+        token = self.memcache.get('%s/user/%s' % (self.reseller_prefixes[0],
+                                                  user_id))
         if token is None:
             raise ValueError(
                 'Invalid Name/User does not exist: %s \n' % (user_id))
@@ -145,8 +144,5 @@ def filter_factory(global_conf, **local_conf):
     conf.update(local_conf)
 
     def swadmin_filter(app):
-        if config_true_value(conf.get('enable_sw_admin', 'False')):
-            return SWAdminMiddleware(app, conf)
-        else:
-            return app
+        return SWAdminMiddleware(app, conf)
     return swadmin_filter
