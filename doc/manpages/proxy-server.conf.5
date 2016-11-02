@@ -454,6 +454,22 @@ container GET (listing) requests.
 
 
 .RS 0
+.IP "\fB[filter:sw_admin]\fR"
+.RE
+
+SW-Admin middleware used for Admin/Ops functions e.g. deleting cached tokens.
+
+.RS 3
+.IP "\fBuse\fR"
+Entry point for paste.deploy for the sw_admin middleware. This is the reference
+to the installed python egg.
+This is normally \fBegg:swift#sw_admin\fR.
+.RE
+.PD
+
+
+
+.RS 0
 .IP "\fB[filter:domain_remap]\fR"
 .RE
 

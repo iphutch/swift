@@ -1,4 +1,4 @@
-# Copyright (c) 2016 OpenStack Foundation
+# Copyright (c) 2016 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -235,17 +235,15 @@ class TestSWAdmin(unittest.TestCase):
         def authorize(req):
             called[0] = True
 
-        #  not_allowed_methods = ['PUT', 'HEAD', 'GET', 'POST']
-        method = 'PUT'
-        req = Request.blank('/sw_admin', environ={
-            'REQUEST_METHOD': method, 'swift.authorize': authorize,
-            'reseller_request': True},
-            headers={})
-        app = self.get_app(FakeApp(), {})
-        resp = app(req.environ, self.start_response)
-        self.assertEqual(['405 Method Not Allowed'], self.got_statuses)
-        self.assertEqual(resp, ['Request method %s is not '
-                                'supported.\n' % (method)])
+        for method in ['PUT', 'HEAD', 'GET', 'POST']:
+            req = Request.blank('/sw_admin', environ={
+                'REQUEST_METHOD': method, 'swift.authorize': authorize,
+                'reseller_request': True
+            })
+            app = self.get_app(FakeApp(), {})
+            app(req.environ, self.start_response)
+            self.assertEqual(['405 Method Not Allowed'], self.got_statuses)
+            self.got_statuses = []
 
 if __name__ == '__main__':
     unittest.main()
